@@ -3,34 +3,45 @@ name: Build APK
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:  # Позволяет запускать вручную
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Стабильная среда, меньше конфликтов
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Setup Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
-    - name: Install dependencies
+    - name: Install system dependencies
       run: |
         sudo apt update
-        sudo apt install -y openjdk-17-jdk automake autoconf libltdl-dev libffi-dev libssl-dev
-        pip install buildozer cython
+        sudo apt install -y openjdk-17-jdk automake autoconf libltdl-dev libffi-dev libssl-dev zlib1g-dev libncurses5-dev patchelf
+    
+    - name: Install Python dependencies
+      run: |
+        pip3 install --upgrade pip setuptools wheel
+        pip3 install buildozer cython==3.0.11
+    
+    - name: Clean previous builds
+      run: |
+        rm -rf .buildozer/bin
+        mkdir -p bin
     
     - name: Build APK
       run: |
         buildozer android debug
       env:
         BUILDOZER_WARN_ON_ROOT: 0
+        P4A_BOOTSTRAP: sdl2
     
-    - name: Upload APK
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: jarvis-apk
         path: bin/*.apk
+        retention-days: 7
