@@ -2,61 +2,43 @@ name: Build APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-    
-    - name: Install system dependencies
-      run: |
-        sudo apt update
-        # Добавлены zlib1g-dev, libncurses5-dev, patchelf, pkg-config - критичны для p4a
-        sudo apt install -y \
-          openjdk-17-jdk \
-          automake autoconf \
-          libltdl-dev libffi-dev libssl-dev \
-          zlib1g-dev libncurses5-dev patchelf pkg-config \
-          git wget unzip
-    
-    - name: Install Python dependencies
-      run: |
-        pip3 install --upgrade pip setuptools wheel
-        pip3 install buildozer cython==3.0.11
-    
-    - name: Clean previous builds and force NDK version
-      run: |
-        rm -rf .buildozer
-        mkdir -p bin
-        
-        # Удаляем системный NDK, чтобы избежать конфликтов
-        sudo rm -rf /usr/local/lib/android/sdk/ndk/*
-        
-        # Принудительно устанавливаем все переменные NDK
-        echo "ANDROIDNDK=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
-        echo "ANDROID_NDK=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
-        echo "ANDROID_NDK_HOME=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
-        echo "ANDROID_NDK_ROOT=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
-    
-    - name: Build APK
-      run: |
-        buildozer android debug
-      env:
-        BUILDOZER_WARN_ON_ROOT: 0
-        P4A_BOOTSTRAP: sdl2
-    
-    - name: Upload APK artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: jarvis-apk
-        path: bin/*.apk
-        retention-days: 7
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y openjdk-17-jdk git zip unzip autoconf automake libtool pkg-config zlib1g-dev libffi-dev libssl-dev libncurses5-dev patchelf
+
+          python -m pip install --upgrade pip
+          pip install buildozer==1.5.0
+          pip install python-for-android==2024.01.21
+          pip install cython==3.0.11
+
+      - name: Clean
+        run: |
+          rm -rf .buildozer
+          rm -rf ~/.buildozer
+
+      - name: Build APK
+        run: |
+          buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: bin/*.apk
