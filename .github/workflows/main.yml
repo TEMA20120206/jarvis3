@@ -20,7 +20,13 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt update
-        sudo apt install -y openjdk-17-jdk automake autoconf libltdl-dev libffi-dev libssl-dev zlib1g-dev libncurses5-dev patchelf
+        # Добавлены zlib1g-dev, libncurses5-dev, patchelf, pkg-config - критичны для p4a
+        sudo apt install -y \
+          openjdk-17-jdk \
+          automake autoconf \
+          libltdl-dev libffi-dev libssl-dev \
+          zlib1g-dev libncurses5-dev patchelf pkg-config \
+          git wget unzip
     
     - name: Install Python dependencies
       run: |
@@ -29,14 +35,13 @@ jobs:
     
     - name: Clean previous builds and force NDK version
       run: |
-        # Удаляем кэш старой сборки
         rm -rf .buildozer
         mkdir -p bin
         
-        # КРИТИЧЕСКИ ВАЖНО: Удаляем системный NDK 27, чтобы он не конфликтовал
+        # Удаляем системный NDK, чтобы избежать конфликтов
         sudo rm -rf /usr/local/lib/android/sdk/ndk/*
         
-        # Принудительно устанавливаем переменные окружения для шага сборки
+        # Принудительно устанавливаем все переменные NDK
         echo "ANDROIDNDK=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
         echo "ANDROID_NDK=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
         echo "ANDROID_NDK_HOME=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
@@ -53,5 +58,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: jarvis-apk
-        path: bin/*.apk
-        retention-days: 7
+      path: bin/*.apk
+      retention-days: 7
