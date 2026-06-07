@@ -6,8 +6,8 @@ version = 1.0.0
 source.dir = .
 main.py = main.py
 
-# ВАЖНО: Жесткая фиксация Python 3.11.9 для совместимости с Kivy 2.3.0
-requirements = python3==3.11.9,kivy==2.3.0,requests,plyer,cython==3.0.11
+# Убрали ==3.11.9, оставили просто python3
+requirements = python3,kivy==2.3.0,requests,plyer,cython==3.0.11
 
 android.permissions = INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE
 
