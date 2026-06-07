@@ -6,12 +6,11 @@ version = 1.0.0
 source.dir = .
 main.py = main.py
 
-# ВАЖНО: Указываем конкретную версию Kivy и Cython
-requirements = python3,kivy==2.3.0,requests,plyer,cython==3.0.11
+# ВАЖНО: Жесткая фиксация Python 3.11.9 для совместимости с Kivy 2.3.0
+requirements = python3==3.11.9,kivy==2.3.0,requests,plyer,cython==3.0.11
 
 android.permissions = INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE
 
-# ЖЁСТКАЯ ФИКСАЦИЯ NDK
 android.ndk = 25b
 android.api = 33
 android.minapi = 21
