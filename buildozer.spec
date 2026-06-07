@@ -1,23 +1,24 @@
 [app]
 title = Jarvis Controller
+
 package.name = jarvis
 package.domain = org.jarvis
-version = 1.0.0
+
 source.dir = .
-main.py = main.py
 
-# ВАЖНО: Указываем Python 3.11 (без минорной версии)
-requirements = python3,kivy==2.3.0,requests,plyer
+version = 1.0.0
 
-android.permissions = INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE
+requirements = python3==3.11.9,kivy==2.3.0,requests,plyer
 
-android.ndk = 25b
+android.permissions = INTERNET,ACCESS_NETWORK_STATE,ACCESS_WIFI_STATE,CHANGE_WIFI_MULTICAST_STATE
+
 android.api = 33
 android.minapi = 21
 android.targetapi = 33
 
+android.ndk = 25b
+
 android.accept_sdk_license = True
-android.exclude_android_tests = True
 
 [buildozer]
 log_level = 2
