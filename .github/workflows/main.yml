@@ -27,21 +27,39 @@ jobs:
         pip3 install --upgrade pip setuptools wheel
         pip3 install buildozer cython==3.0.11
     
-    - name: Clean previous builds and cache
+    - name: Clean previous builds
       run: |
         rm -rf .buildozer
         mkdir -p bin
     
-    - name: Build APK
+    - name: Build APK with full log
       run: |
-        buildozer android debug
+        buildozer android debug 2>&1 | tee build.log
+        echo "BUILD_EXIT_CODE=$?" >> $GITHUB_ENV
       env:
         BUILDOZER_WARN_ON_ROOT: 0
         P4A_BOOTSTRAP: sdl2
     
+    - name: Upload full build log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
+        retention-days: 7
+    
+    - name: Find APK file
+      run: |
+        find . -name "*.apk" -type f
+        echo "APK_FILES=$(find . -name '*.apk' -type f | tr '\n' ',')" >> $GITHUB_ENV
+    
     - name: Upload APK artifact
+      if: env.APK_FILES != ''
       uses: actions/upload-artifact@v4
       with:
         name: jarvis-apk
-        path: bin/*.apk
+        path: |
+          bin/*.apk
+          **/bin/*.apk
         retention-days: 7
+        if-no-files-found: warn
