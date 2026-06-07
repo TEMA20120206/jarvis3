@@ -5,8 +5,7 @@ from kivy.uix.button import Button
 from kivy.uix.scrollview import ScrollView
 from kivy.clock import Clock
 from kivy.animation import Animation
-from kivy.core.audio import SoundLoader
-from kivy.graphics import Color, Rectangle, RoundedRectangle
+from kivy.graphics import Color, Rectangle
 from kivy.utils import get_color_from_hex
 import socket
 import re
@@ -19,15 +18,20 @@ PC_IP = "192.168.0.115"           # ← ТВОЙ IP (потом заменишь
 # =============================================
 
 def send_wol(mac):
-    mac = re.sub(r'[:\-.]', '', mac).upper()
-    if len(mac) != 12:
+    """Отправка Wake-on-LAN пакета"""
+    try:
+        mac = re.sub(r'[:\-.]', '', mac).upper()
+        if len(mac) != 12:
+            return False
+        data = bytes.fromhex('FF' * 6 + mac * 16)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.sendto(data, ('255.255.255.255', 9))
+        sock.close()
+        return True
+    except Exception as e:
+        print(f"WOL Error: {e}")
         return False
-    data = bytes.fromhex('FF' * 6 + mac * 16)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    sock.sendto(data, ('255.255.255.255', 9))
-    sock.close()
-    return True
 
 class JarvisApp(App):
     def build(self):
@@ -63,7 +67,7 @@ class JarvisApp(App):
         
         # Кнопка 1 - Включить ПК
         self.btn_power = Button(
-            text="🔵 АКТИВИРОВАТЬ СИСТЕМУ",
+            text=" АКТИВИРОВАТЬ СИСТЕМУ",
             size_hint=(1, None),
             height=80,
             background_color=(0.0, 0.5, 0.9, 0.9),
@@ -143,40 +147,62 @@ class JarvisApp(App):
         self.status_label.text = "● ONLINE. READY, SIR."
     
     def power_on_pc(self, instance):
+        """Безопасный вызов WOL в отдельном потоке"""
         self.status_label.text = "⟳ ОТПРАВКА СИГНАЛА... STAND BY."
         
         # Анимация кнопки
         instance.background_color = (0.0, 0.3, 0.6, 1)
         Clock.schedule_once(lambda dt: self.reset_button_color(instance), 0.2)
         
-        if send_wol(PC_MAC):
+        # ВАЖНО: Запускаем сеть в фоне, чтобы не блокировать UI
+        def wol_thread():
+            success = send_wol(PC_MAC)
+            # Обновляем UI только из основного потока через Clock
+            Clock.schedule_once(lambda dt: self._on_wol_result(success), 0)
+            
+        threading.Thread(target=wol_thread, daemon=True).start()
+    
+    def _on_wol_result(self, success):
+        """Обработка результата WOL в основном потоке"""
+        if success:
             self.status_label.text = "✓ СИГНАЛ ОТПРАВЛЕН. АКТИВАЦИЯ..."
-            Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
         else:
             self.status_label.text = "✗ ОШИБКА. НЕВЕРНЫЙ MAC"
-            Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
+        Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
     
     def reset_button_color(self, button):
         button.background_color = (0.0, 0.5, 0.9, 0.9)
     
     def launch_cs(self, instance):
+        """Безопасный HTTP запрос в отдельном потоке"""
         self.status_label.text = "⟳ ЗАПУСК КОНТР-СТРАЙКА..."
         
         # Анимация кнопки
         instance.background_color = (0.0, 0.3, 0.6, 1)
         Clock.schedule_once(lambda dt: self.reset_button_color(instance), 0.2)
         
-        try:
-            response = requests.get(f"http://{PC_IP}:8888/cs", timeout=3)
-            if response.status_code == 200:
-                self.status_label.text = "✓ КОНТР-СТРАЙК ЗАПУЩЕН"
-                Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
-            else:
-                self.status_label.text = "✗ ОШИБКА СЕРВЕРА"
-                Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
-        except:
-            self.status_label.text = "✗ СВЯЗЬ ПОТЕРЯНА"
-            Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
+        def cs_thread():
+            try:
+                response = requests.get(f"http://{PC_IP}:8888/cs", timeout=5)
+                if response.status_code == 200:
+                    msg = "✓ КОНТР-СТРАЙК ЗАПУЩЕН"
+                else:
+                    msg = f"✗ ОШИБКА СЕРВЕРА ({response.status_code})"
+            except requests.exceptions.Timeout:
+                msg = "✗ ТАЙМАУТ. ПРОВЕРЬ ПК"
+            except requests.exceptions.ConnectionError:
+                msg = "✗ НЕТ СВЯЗИ С ПК"
+            except Exception as e:
+                msg = f"✗ ОШИБКА: {str(e)[:30]}"
+            
+            # Безопасное обновление UI
+            Clock.schedule_once(lambda dt: self._set_temp_status(msg), 0)
+            
+        threading.Thread(target=cs_thread, daemon=True).start()
+    
+    def _set_temp_status(self, text):
+        self.status_label.text = text
+        Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
 
 if __name__ == "__main__":
     JarvisApp().run()
