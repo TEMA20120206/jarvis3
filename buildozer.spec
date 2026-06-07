@@ -6,6 +6,8 @@ version = 1.0.0
 source.dir = .
 main.py = main.py
 
+# Убрали p4a.branch = develop, так как он не помог
+# Добавили blacklist_libs, чтобы исключить проблемную библиотеку
 requirements = python3==3.11.9,hostpython3==3.11.9,kivy==2.3.0,requests,plyer,cython==3.0.11
 
 android.permissions = INTERNET, ACCESS_NETWORK_STATE, ACCESS_WIFI_STATE, CHANGE_WIFI_MULTICAST_STATE
@@ -18,8 +20,8 @@ android.targetapi = 33
 android.accept_sdk_license = True
 android.exclude_android_tests = True
 
-# ВАЖНО: Используем develop-ветку с фиксом для libthorvg и pip
-p4a.branch = develop
+# ИСКЛЮЧАЕМ ПРОБЛЕМНУЮ БИБЛИОТЕКУ
+blacklist_libs = libthorvg
 
 [buildozer]
 log_level = 2
