@@ -32,34 +32,26 @@ jobs:
         rm -rf .buildozer
         mkdir -p bin
     
-    - name: Build APK with full log
+    - name: Force correct NDK version
       run: |
-        buildozer android debug 2>&1 | tee build.log
-        echo "BUILD_EXIT_CODE=$?" >> $GITHUB_ENV
+        # Удаляем системный NDK 27, чтобы он не мешал
+        sudo rm -rf /usr/local/lib/android/sdk/ndk/*
+        # Указываем Buildozer использовать только наш NDK 25b
+        export ANDROIDNDK=/home/runner/.buildozer/android/platform/android-ndk-r25b
+        echo "ANDROIDNDK=$ANDROIDNDK" >> $GITHUB_ENV
+    
+    - name: Build APK
+      run: |
+        buildozer android debug
       env:
         BUILDOZER_WARN_ON_ROOT: 0
         P4A_BOOTSTRAP: sdl2
-    
-    - name: Upload full build log
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: build-log
-        path: build.log
-        retention-days: 7
-    
-    - name: Find APK file
-      run: |
-        find . -name "*.apk" -type f
-        echo "APK_FILES=$(find . -name '*.apk' -type f | tr '\n' ',')" >> $GITHUB_ENV
+        # Переопределяем переменную среды для шага сборки
+        ANDROID_NDK: /home/runner/.buildozer/android/platform/android-ndk-r25b
     
     - name: Upload APK artifact
-      if: env.APK_FILES != ''
       uses: actions/upload-artifact@v4
       with:
         name: jarvis-apk
-        path: |
-          bin/*.apk
-          **/bin/*.apk
+        path: bin/*.apk
         retention-days: 7
-        if-no-files-found: warn
