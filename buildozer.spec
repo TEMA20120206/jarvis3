@@ -18,7 +18,7 @@ android.targetapi = 33
 android.accept_sdk_license = True
 android.exclude_android_tests = True
 
-# ИСПОЛЬЗУЕМ DEVELOP-ВЕТКУ С ФИКСОМ ДЛЯ PIP 25.x
+# ВАЖНО: Используем develop-ветку с фиксом для libthorvg и pip
 p4a.branch = develop
 
 [buildozer]
