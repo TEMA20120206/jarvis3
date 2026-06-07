@@ -17,29 +17,28 @@ jobs:
       with:
         python-version: '3.11'
     
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y openjdk-17-jdk automake autoconf libltdl-dev libffi-dev libssl-dev zlib1g-dev libncurses5-dev patchelf
-    
-    - name: Install Python dependencies
-      run: |
-        pip3 install --upgrade pip setuptools wheel
+        sudo apt install -y openjdk-17-jdk automake autoconf libltdl-dev libffi-dev libssl-dev zlib1g-dev libncurses5-dev
         pip3 install buildozer cython==3.0.11
     
-    - name: Clean previous builds
+    - name: Build APK with verbose output
       run: |
-        rm -rf .buildozer/bin
-        mkdir -p bin
-    
-    - name: Build APK
-      run: |
-        buildozer android debug
+        buildozer -v android debug 2>&1 | tee build.log
       env:
         BUILDOZER_WARN_ON_ROOT: 0
-        P4A_BOOTSTRAP: sdl2
     
-    - name: Upload APK artifact
+    - name: Upload full log on failure
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log
+        path: build.log
+        retention-days: 7
+    
+    - name: Upload APK
+      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: jarvis-apk
