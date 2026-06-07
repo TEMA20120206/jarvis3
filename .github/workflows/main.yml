@@ -27,18 +27,20 @@ jobs:
         pip3 install --upgrade pip setuptools wheel
         pip3 install buildozer cython==3.0.11
     
-    - name: Clean previous builds
+    - name: Clean previous builds and force NDK version
       run: |
+        # Удаляем кэш старой сборки
         rm -rf .buildozer
         mkdir -p bin
-    
-    - name: Force correct NDK version
-      run: |
-        # Удаляем системный NDK 27, чтобы он не мешал
+        
+        # КРИТИЧЕСКИ ВАЖНО: Удаляем системный NDK 27, чтобы он не конфликтовал
         sudo rm -rf /usr/local/lib/android/sdk/ndk/*
-        # Указываем Buildozer использовать только наш NDK 25b
-        export ANDROIDNDK=/home/runner/.buildozer/android/platform/android-ndk-r25b
-        echo "ANDROIDNDK=$ANDROIDNDK" >> $GITHUB_ENV
+        
+        # Принудительно устанавливаем переменные окружения для шага сборки
+        echo "ANDROIDNDK=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
+        echo "ANDROID_NDK=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
+        echo "ANDROID_NDK_HOME=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
+        echo "ANDROID_NDK_ROOT=/home/runner/.buildozer/android/platform/android-ndk-r25b" >> $GITHUB_ENV
     
     - name: Build APK
       run: |
@@ -46,8 +48,6 @@ jobs:
       env:
         BUILDOZER_WARN_ON_ROOT: 0
         P4A_BOOTSTRAP: sdl2
-        # Переопределяем переменную среды для шага сборки
-        ANDROID_NDK: /home/runner/.buildozer/android/platform/android-ndk-r25b
     
     - name: Upload APK artifact
       uses: actions/upload-artifact@v4
