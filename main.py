@@ -1,208 +1,91 @@
+import socket
+import struct
+import threading
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.label import Label
 from kivy.uix.button import Button
-from kivy.uix.scrollview import ScrollView
+from kivy.uix.label import Label
 from kivy.clock import Clock
-from kivy.animation import Animation
-from kivy.graphics import Color, Rectangle
-from kivy.utils import get_color_from_hex
-import socket
-import re
 import requests
-import threading
 
-# ========== НАСТРОЙКИ (ТВОИ ДАННЫЕ) ==========
-PC_MAC = "08:62:66:2C:D8:93"      # ← ТВОЙ MAC
-PC_IP = "192.168.0.115"           # ← ТВОЙ IP (потом заменишь)
-# =============================================
+class JarvisBackground(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.orientation = 'vertical'
+        self.padding = 20
+        self.spacing = 20
 
-def send_wol(mac):
-    """Отправка Wake-on-LAN пакета"""
-    try:
-        mac = re.sub(r'[:\-.]', '', mac).upper()
-        if len(mac) != 12:
-            return False
-        data = bytes.fromhex('FF' * 6 + mac * 16)
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.sendto(data, ('255.255.255.255', 9))
-        sock.close()
-        return True
-    except Exception as e:
-        print(f"WOL Error: {e}")
-        return False
+        # Статусный лог
+        self.status_label = Label(
+            text="J.A.R.V.I.S. Инициализация...",
+            font_size='18sp',
+            color=(0, 0.8, 1, 1)  # Неоновый голубой
+        )
+        self.add_widget(self.status_label)
+
+        # Кнопка Wake-on-LAN
+        self.wol_button = Button(
+            text="ВКЛЮЧИТЬ ПК (WOL)",
+            background_color=(0, 0.5, 0.8, 1),
+            font_size='20sp'
+        )
+        self.wol_button.bind(on_press=self.start_wol_thread)
+        self.add_widget(self.wol_button)
+
+        # Кнопка Запуска Игры (HTTP)
+        self.game_button = Button(
+            text="ЗАПУСТИТЬ CS",
+            background_color=(0, 0.7, 0.5, 1),
+            font_size='20sp'
+        )
+        self.game_button.bind(on_press=self.start_http_thread)
+        self.add_widget(self.game_button)
+
+    def update_status(self, text):
+        self.status_label.text = text
+
+    # --- Потоки во избежание фризов UI ---
+    def start_wol_thread(self, instance):
+        self.update_status("Отправка макропакета WOL...")
+        threading.Thread(target=self.send_wol, daemon=True).start()
+
+    def start_http_thread(self, instance):
+        self.update_status("Запрос на запуск игры...")
+        threading.Thread(target=self.send_http_request, daemon=True).start()
+
+    # --- Логика WOL ---
+    def send_wol(self):
+        # ЗАМЕНИ НА СВОЙ MAC-АДРЕС ПК
+        mac_address = "30-C5-99-28-8B-2D" 
+        try:
+            add_sep = mac_address.replace(":", "")
+            data = ''.join(['FFFFFFFFFFFF', add_sep * 16])
+            packet = struct.pack('B' * 102, *[int(data[i:i+2], 16) for i in range(0, len(data), 2)])
+            
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.sendto(packet, ('255.255.255.255', 9))
+            sock.close()
+            Clock.schedule_once(lambda dt: self.update_status("Пакет WOL успешно отправлен!"), 0)
+        except Exception as e:
+            Clock.schedule_once(lambda dt: self.update_status(f"Ошибка WOL: {str(e)}"), 0)
+
+    # --- Логика HTTP ---
+    def send_http_request(self):
+        # ЗАМЕНИ НА IP СВОЕГО СЕРВЕРА НА ПК
+        url = "http://192.168.0.110:5000/start-game" 
+        try:
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                Clock.schedule_once(lambda dt: self.update_status("Команда на ПК выполнена!"), 0)
+            else:
+                Clock.schedule_once(lambda dt: self.update_status(f"Код сервера: {response.status_code}"), 0)
+        except Exception as e:
+            Clock.schedule_once(lambda dt: self.update_status(f"Ошибка сети: {str(e)}"), 0)
 
 class JarvisApp(App):
     def build(self):
-        self.title = "Jarvis Controller"
-        
-        # Главный контейнер
-        main_layout = BoxLayout(orientation='vertical', padding=20, spacing=20)
-        
-        # Тёмный фон
-        with main_layout.canvas.before:
-            Color(0.03, 0.05, 0.12, 1)
-            self.bg_rect = Rectangle(size=main_layout.size, pos=main_layout.pos)
-            main_layout.bind(size=self.update_bg, pos=self.update_bg)
-        
-        # Верхняя неоновая линия
-        top_line = Label(size_hint_y=0.01)
-        with top_line.canvas:
-            Color(0.0, 0.8, 1.0, 1)
-            Rectangle(size=(main_layout.width, 2))
-        
-        # Заголовок
-        title_label = Label(
-            text="[color=00ccff]J.A.R.V.I.S.[/color]\n[color=0088aa]v.2.0[/color]",
-            markup=True,
-            font_size='28sp',
-            size_hint_y=0.15,
-            halign='center'
-        )
-        
-        # Контейнер для кнопок
-        buttons_layout = BoxLayout(orientation='vertical', spacing=25, size_hint_y=None)
-        buttons_layout.bind(minimum_height=buttons_layout.setter('height'))
-        
-        # Кнопка 1 - Включить ПК
-        self.btn_power = Button(
-            text=" АКТИВИРОВАТЬ СИСТЕМУ",
-            size_hint=(1, None),
-            height=80,
-            background_color=(0.0, 0.5, 0.9, 0.9),
-            color=(1, 1, 1, 1),
-            font_size='18sp'
-        )
-        self.btn_power.bind(on_release=self.power_on_pc)
-        
-        # Кнопка 2 - Запустить CS
-        self.btn_cs = Button(
-            text="🎮 ЗАПУСТИТЬ КОНТР-СТРАЙК",
-            size_hint=(1, None),
-            height=80,
-            background_color=(0.0, 0.5, 0.9, 0.9),
-            color=(1, 1, 1, 1),
-            font_size='18sp'
-        )
-        self.btn_cs.bind(on_release=self.launch_cs)
-        
-        buttons_layout.add_widget(self.btn_power)
-        buttons_layout.add_widget(self.btn_cs)
-        
-        # Скролл для кнопок
-        scroll = ScrollView()
-        scroll.add_widget(buttons_layout)
-        
-        # Статусная строка
-        self.status_label = Label(
-            text="● ONLINE. READY, SIR.",
-            color=(0.0, 1.0, 0.7, 1),
-            size_hint_y=0.08,
-            font_size='14sp',
-            halign='center'
-        )
-        
-        # Нижняя неоновая линия
-        bottom_line = Label(size_hint_y=0.01)
-        with bottom_line.canvas:
-            Color(0.0, 0.8, 1.0, 0.7)
-            Rectangle(size=(main_layout.width, 1))
-        
-        # Собираем всё вместе
-        main_layout.add_widget(top_line)
-        main_layout.add_widget(title_label)
-        main_layout.add_widget(scroll)
-        main_layout.add_widget(self.status_label)
-        main_layout.add_widget(bottom_line)
-        
-        # Анимации
-        Clock.schedule_interval(self.pulse_status, 0.8)
-        Clock.schedule_once(lambda dt: self.welcome_message(), 0.5)
-        self.animate_buttons()
-        
-        return main_layout
-    
-    def update_bg(self, instance, value):
-        self.bg_rect.size = instance.size
-        self.bg_rect.pos = instance.pos
-    
-    def animate_buttons(self):
-        anim = Animation(opacity=1, duration=0.5) + Animation(opacity=0.9, duration=0.3) * 2
-        anim.start(self.btn_power)
-        anim.start(self.btn_cs)
-    
-    def pulse_status(self, dt):
-        text = self.status_label.text
-        if "●" in text:
-            self.status_label.text = text.replace("●", "○")
-        else:
-            self.status_label.text = text.replace("○", "●")
-    
-    def welcome_message(self):
-        self.status_label.text = "◉ INITIALIZING JARVIS..."
-        Clock.schedule_once(lambda dt: self.set_status_ready(), 1.5)
-    
-    def set_status_ready(self):
-        self.status_label.text = "● ONLINE. READY, SIR."
-    
-    def power_on_pc(self, instance):
-        """Безопасный вызов WOL в отдельном потоке"""
-        self.status_label.text = "⟳ ОТПРАВКА СИГНАЛА... STAND BY."
-        
-        # Анимация кнопки
-        instance.background_color = (0.0, 0.3, 0.6, 1)
-        Clock.schedule_once(lambda dt: self.reset_button_color(instance), 0.2)
-        
-        # ВАЖНО: Запускаем сеть в фоне, чтобы не блокировать UI
-        def wol_thread():
-            success = send_wol(PC_MAC)
-            # Обновляем UI только из основного потока через Clock
-            Clock.schedule_once(lambda dt: self._on_wol_result(success), 0)
-            
-        threading.Thread(target=wol_thread, daemon=True).start()
-    
-    def _on_wol_result(self, success):
-        """Обработка результата WOL в основном потоке"""
-        if success:
-            self.status_label.text = "✓ СИГНАЛ ОТПРАВЛЕН. АКТИВАЦИЯ..."
-        else:
-            self.status_label.text = "✗ ОШИБКА. НЕВЕРНЫЙ MAC"
-        Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
-    
-    def reset_button_color(self, button):
-        button.background_color = (0.0, 0.5, 0.9, 0.9)
-    
-    def launch_cs(self, instance):
-        """Безопасный HTTP запрос в отдельном потоке"""
-        self.status_label.text = "⟳ ЗАПУСК КОНТР-СТРАЙКА..."
-        
-        # Анимация кнопки
-        instance.background_color = (0.0, 0.3, 0.6, 1)
-        Clock.schedule_once(lambda dt: self.reset_button_color(instance), 0.2)
-        
-        def cs_thread():
-            try:
-                response = requests.get(f"http://{PC_IP}:8888/cs", timeout=5)
-                if response.status_code == 200:
-                    msg = "✓ КОНТР-СТРАЙК ЗАПУЩЕН"
-                else:
-                    msg = f"✗ ОШИБКА СЕРВЕРА ({response.status_code})"
-            except requests.exceptions.Timeout:
-                msg = "✗ ТАЙМАУТ. ПРОВЕРЬ ПК"
-            except requests.exceptions.ConnectionError:
-                msg = "✗ НЕТ СВЯЗИ С ПК"
-            except Exception as e:
-                msg = f"✗ ОШИБКА: {str(e)[:30]}"
-            
-            # Безопасное обновление UI
-            Clock.schedule_once(lambda dt: self._set_temp_status(msg), 0)
-            
-        threading.Thread(target=cs_thread, daemon=True).start()
-    
-    def _set_temp_status(self, text):
-        self.status_label.text = text
-        Clock.schedule_once(lambda dt: self.set_status_ready(), 3)
+        return JarvisBackground()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     JarvisApp().run()
